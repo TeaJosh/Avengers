@@ -1,0 +1,51 @@
+/* Box Model Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Set background properly */
+html, body {
+  min-height: 100vh;
+  background-image: linear-gradient(to right, #141e30, #243b55);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/* Image Reset */
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Lists Reset */
+ul, ol, menu {
+  list-style: none;
+  padding-left: 0;
+}
+
+article ul, article ol {
+  list-style-position: inside;
+}
+
+/* Links */
+a {
+  text-decoration-skip-ink: auto;
+  text-underline-position: under;
+  text-decoration-thickness: 8%;
+}
+
+/* Root Settings */
+html {
+  font-size: 62.5%; /* 1rem = 10px */
+  -webkit-text-size-adjust: 100%; /* Safari */
+  text-size-adjust: 100%; /* Other mobile browsers */
+  scroll-behavior: smooth;
+}
+
+/* Accessibility: Only show focus outlines when needed */
+:focus:not(:focus-visible) {
+  outline: none;
+}
