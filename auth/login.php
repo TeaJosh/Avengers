@@ -15,8 +15,15 @@ $public_url = $base_url . "/index.php";
 $js_url = $base_url . "/assets/js";
 $css_url = $base_url . "/assets/css";
 
-// Include database connection
-include($_SERVER['DOCUMENT_ROOT'] . $base_url . "/config/database.php");
+// Include database connection - Make sure this file sets up the $pdo variable
+require_once($_SERVER['DOCUMENT_ROOT'] . $base_url . "/config/database.php");
+
+/*
+// Check if $pdo is set after including the database file
+if (!isset($pdo)) {
+    die("Database connection failed. Please check your database configuration.");
+}
+*/
 
 // Path setup
 $includes_path = $_SERVER["DOCUMENT_ROOT"] . $base_url . "/includes";
@@ -45,12 +52,15 @@ if (isset($_SESSION['valid_user'])) {
 		try {
 			$query = $pdo->prepare("SELECT id, password FROM users WHERE username = :username");
 			$query->execute(['username' => $username]);
+			
+			// echo $query;
+			// sleep(100);
 			$user = $query->fetch();
 			if ($user && password_verify($password, $user['password'])) {
 				$login_successful = true;
 			}
 		} catch (Exception $e) {
-			$message = "Database query failure";
+			$message = "Database query failure: " . $e->getMessage();
 			$message_type = "danger";
 		}
 	}
@@ -60,7 +70,8 @@ if (isset($_SESSION['valid_user'])) {
 		$message_type = "success";
 		$show_form = false;
 	} else {
-		$message = !empty($username) ? "Could not log you in!" : "You are not logged in!";
+		$message = !empty($username) ? $username . $password:
+		"Could not log you in!" ; "You are not logged in!";
 		$message_type = "danger";
 	}
 }
@@ -77,7 +88,6 @@ if (isset($_SESSION['valid_user'])) {
 </head>
 <body>
 <?php include($header); ?>
-
 <!-- Section: Design Block -->
 <section class="">
 	<!-- Jumbotron -->
@@ -99,7 +109,6 @@ if (isset($_SESSION['valid_user'])) {
 				<div class="col-lg-6 mb-5 mb-lg-0">
 					<div class="card">
 						<div class="card-body py-5 px-md-5">
-
 							<?php if (!empty($message)): ?>
 								<div class="alert alert-<?php echo $message_type; ?> text-center" role="alert">
 									<?php echo $message; ?>
@@ -121,9 +130,7 @@ if (isset($_SESSION['valid_user'])) {
 									</div>
 
 									<!-- Submit button -->
-									<button type="submit" class="btn btn-primary btn-block mb-4">
-										Login
-									</button>
+									<button type="submit" class="btn btn-primary btn-block mb-4">Login</button>
 
 									<!-- Register link -->
 									<div class="text-center">
@@ -132,7 +139,7 @@ if (isset($_SESSION['valid_user'])) {
 								</form>
 							<?php else: ?>
 								<div class="text-center mt-4">
-									<a href="members_only.php" class="btn btn-outline-primary">Go to Members Area</a>
+									<a href="../posts/index.php" class="btn btn-outline-primary">Go to Posts</a>
 								</div>
 							<?php endif; ?>
 						</div>

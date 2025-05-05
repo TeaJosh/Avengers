@@ -1,8 +1,50 @@
 <?php
 /**
+ * Database Connection Configuration
+ * 
+ * This file establishes a connection to the database using PDO
+ * and sets up the $pdo variable for use in other scripts.
+ */
+
+// Detect whether you're on localhost or live server
+if (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false) {
+    $base_url = "/avengers_blog";
+} else {
+    $base_url = '/ics325/students/2025/TRana';
+}
+
+// Database credentials
+$db_host = "localhost";
+$db_name = "tranablog";
+$db_user = "root";
+$db_pass = "";
+
+// Create a PDO instance
+try {
+    $pdo = new PDO(
+        "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4",
+        $db_user,
+        $db_pass,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ]
+    );
+    
+    // Optionally create a Database class instance if you need it elsewhere
+    $db = new Database($db_user, $db_pass, $db_name, $db_host);
+
+} catch (PDOException $e) {
+    // Log the error but don't expose details
+    error_log("Database connection failed: " . $e->getMessage());
+    $pdo = null; // Ensure $pdo is null so the check in login.php works
+}
+
+/**
  * Database Class for Blog Application
  * 
- * Last updated: 2025-04-30 03:56:07 UTC
+ * Last updated: 2025-05-04
  * Updated by: Tejosh Rana
  * 
  * This class provides a data access layer for the blog application.
@@ -29,8 +71,8 @@ class Database {
         $this->server = $server;
         
         // Test connection immediately
-        $connection = $this->connect();
-        if ($connection === null) {
+        $this->connection = $this->connect();
+        if ($this->connection === null) {
             throw new PDOException("Failed to connect to database. Please check credentials and server status.");
         }
         
@@ -111,10 +153,10 @@ class Database {
     public function connect() {
         try {
             $dsn = "mysql:host={$this->server};dbname={$this->db};charset=utf8mb4";
-            $this->connection = new PDO($dsn, $this->user, $this->password);
-            $this->connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $this->connection->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-            return $this->connection;
+            $connection = new PDO($dsn, $this->user, $this->password);
+            $connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $connection->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            return $connection;
         } catch (PDOException $e) {
             error_log("Connection failed: " . $e->getMessage());
             return null;
@@ -134,7 +176,7 @@ class Database {
     public function Query($sql, $params = []) {
         try {
             if ($this->connection === null) {
-                $this->connect();
+                $this->connection = $this->connect();
                 if ($this->connection === null) {
                     error_log("Database connection is null in Query");
                     return false;
@@ -155,7 +197,7 @@ class Database {
     public function QueryAll($sql, $params = []) {
         try {
             if ($this->connection === null) {
-                $this->connect();
+                $this->connection = $this->connect();
                 if ($this->connection === null) {
                     error_log("Database connection is null in QueryAll");
                     return null;
@@ -177,7 +219,7 @@ class Database {
     public function QueryArray($sql, $params = []) {
         try {
             if ($this->connection === null) {
-                $this->connect();
+                $this->connection = $this->connect();
                 if ($this->connection === null) {
                     error_log("Database connection is null in QueryArray");
                     return null;
@@ -228,7 +270,7 @@ class Database {
         
         // Required fields check
         foreach ($rules['required'] as $field) {
-            if (!isset($data[$field]) || empty($data[$field])) {
+            if (!isset($data[$field]) || empty($data[$field]) && $data[$field] !== 0) {
                 error_log("Missing required field: $field for $table");
                 return false;
             }
@@ -295,7 +337,7 @@ class Database {
         }
         
         // Password hashing for users table
-        if ($table === 'users' && isset($data['password'])) {
+        if ($table === 'users' && isset($data['password']) && !preg_match('/^\$2[ayb]\$.{56}$/', $data['password'])) {
             $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         }
         
@@ -393,7 +435,7 @@ class Database {
         }
         
         // Password hashing for users table
-        if ($table === 'users' && isset($data['password'])) {
+        if ($table === 'users' && isset($data['password']) && !preg_match('/^\$2[ayb]\$.{56}$/', $data['password'])) {
             $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         }
         
@@ -647,6 +689,148 @@ class Database {
     
     public function DeleteRanking($id) {
         return $this->Delete('rankings', $id);
+    }
+
+    /**
+     * Verifies that all required tables exist in the database
+     * 
+     * @return array with success status and list of missing tables
+     */
+    public function verifyTables() {
+        $requiredTables = [
+            'roles',
+            'users',
+            'users_info',
+            'topics',
+            'posts',
+            'comments',
+            'rankings'
+        ];
+        
+        $missingTables = [];
+        
+        try {
+            if ($this->connection === null) {
+                $this->connection = $this->connect();
+                if ($this->connection === null) {
+                    throw new Exception("Unable to connect to database");
+                }
+            }
+            
+            // Get all tables in the current database
+            $stmt = $this->connection->query("SHOW TABLES");
+            $existingTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Check which required tables are missing
+            foreach ($requiredTables as $table) {
+                if (!in_array($table, $existingTables)) {
+                    $missingTables[] = $table;
+                }
+            }
+            
+            return [
+                'success' => empty($missingTables),
+                'missing' => $missingTables
+            ];
+        } catch (Exception $e) {
+            error_log("Table verification failed: " . $e->getMessage());
+            return [
+                'success' => false,
+                'missing' => $requiredTables,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Gets the last error message from the database connection
+     *
+     * @return string|null The last error message or null if no error
+     */
+    public function getLastError() {
+        if ($this->connection === null) {
+            return "No database connection";
+        }
+        
+        $errorInfo = $this->connection->errorInfo();
+        return isset($errorInfo[2]) ? $errorInfo[2] : null;
+    }
+
+    /**
+     * Enhanced AddUser method with better error handling
+     * 
+     * @param string $username The username
+     * @param string $password The password (will be hashed)
+     * @param int $role_id The role ID
+     * @return int|false The new user ID or false on failure
+     */
+    public function EnhancedAddUser($username, $password, $role_id) {
+        try {
+            // Basic validation
+            if (empty($username) || empty($password) || empty($role_id)) {
+                error_log("Missing required fields for user creation");
+                return false;
+            }
+            
+            // Check if username already exists
+            $existingUser = $this->GetUser(null, "username", $username);
+            if (!empty($existingUser)) {
+                error_log("Username already exists: " . $username);
+                return false;
+            }
+            
+            // Check if role exists
+            $existingRole = $this->GetRole($role_id);
+            if (empty($existingRole)) {
+                error_log("Role does not exist: " . $role_id);
+                return false;
+            }
+            
+            // Hash password if it's not already hashed
+            $hashedPassword = $password;
+            if (!preg_match('/^\$2[ayb]\$.{56}$/', $password)) {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            }
+            
+            // Current timestamp
+            $now = date('Y-m-d H:i:s');
+            
+            // Insert user with prepared statement
+            $sql = "INSERT INTO users (username, password, role_id, created_at) VALUES (?, ?, ?, ?)";
+            
+            if ($this->connection === null) {
+                $this->connection = $this->connect();
+                if ($this->connection === null) {
+                    error_log("Database connection is null in EnhancedAddUser");
+                    return false;
+                }
+            }
+            
+            $stmt = $this->connection->prepare($sql);
+            $result = $stmt->execute([$username, $hashedPassword, $role_id, $now]);
+            
+            if ($result) {
+                return $this->connection->lastInsertId();
+            } else {
+                error_log("Failed to insert user: " . implode(", ", $stmt->errorInfo()));
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log("Exception in EnhancedAddUser: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get the PDO connection
+     * 
+     * @return PDO|null The PDO connection or null if not connected
+     */
+    public function getConnection() {
+        if ($this->connection === null) {
+            $this->connection = $this->connect();
+        }
+        return $this->connection;
     }
 }
 ?>

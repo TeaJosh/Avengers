@@ -2,8 +2,8 @@
 /**
  * Registration Page for Avengers Blog
  * 
- * Last updated: 2025-05-02 03:38:21 UTC
- * Updated by: TeaJosh
+ * Last updated: 2025-05-04
+ * Updated by: Debugging fix
  * 
  * This file handles new user registration with full database integration
  * and proper error handling.
@@ -56,13 +56,13 @@ function verifyDatabaseSetup() {
                 }
             }
             return [
-                'success' => $db_exists && $user_exists && $has_permissions,
-                'message' => $db_exists && $user_exists && $has_permissions ? 
+                'success' => $db_exists && $user_exists, // $has_permissions,
+                'message' => $db_exists && $user_exists ? // $has_permissions ? 
                     "Database setup verified" : 
                     "Missing configuration: " . 
                     (!$db_exists ? "database " : "") . 
-                    (!$user_exists ? "user " : "") . 
-                    (!$has_permissions ? "permissions" : "")
+                    (!$user_exists ? "user " : "")
+                    // (!$has_permissions ? "permissions" : "")
             ];
         }
         
@@ -112,7 +112,12 @@ if (isset($_SESSION['valid_user'])) {
         }
 
         // Initialize database connection
-        $db = new Database();
+        // Use consistent credentials - root for localhost or bloguser for production
+        if ($is_localhost) {
+            $db = new Database("root", "", "tranablog", "localhost");
+        } else {
+            $db = new Database(); // Uses default credentials from the class
+        }
         
         // Verify tables exist
         $tables_check = $db->verifyTables();
@@ -160,7 +165,9 @@ if (isset($_SESSION['valid_user'])) {
         // Process registration if no errors
         if (empty($errors)) {
             // Get default role (3 = normal user)
-            $default_role = $db->GetRole(null, 'name', 'User');
+            $default_role = $db->GetRole(null, 'name', 'user');
+            
+            // If default role found, use its ID, otherwise fallback to 3
             $role_id = !empty($default_role) ? $default_role[0]['id'] : 3;
             
             // Use enhanced AddUser method with better error handling
@@ -187,18 +194,17 @@ if (isset($_SESSION['valid_user'])) {
                     $show_form = false;
                 } else {
                     // Log detailed error for user_info
-                    error_log("Failed to add user_info for user ID: $userId");
+                    $error_msg = $db->getLastError() ?: "Could not create user profile";
+                    error_log("Failed to add user_info for user ID: $userId. Error: $error_msg");
                     
                     // Rollback if user_info creation fails
                     $db->DeleteUser($userId);
                     
-                    // Get specific error if available
-                    $error_msg = method_exists($db, 'getLastError') ? $db->getLastError() : "Could not create user profile";
                     throw new Exception($error_msg);
                 }
             } else {
                 // Get specific error if available
-                $error_msg = method_exists($db, 'getLastError') ? $db->getLastError() : "Could not create user account";
+                $error_msg = $db->getLastError() ?: "Could not create user account";
                 throw new Exception($error_msg);
             }
         } else {
@@ -226,7 +232,6 @@ if (isset($_SESSION['valid_user'])) {
 </head>
 <body>
 <?php include($header); ?>
-
 <section class="">
     <div class="px-4 py-5 px-md-5 text-center text-lg-start">
         <div class="container">

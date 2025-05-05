@@ -6,9 +6,9 @@ if (session_status() == PHP_SESSION_NONE) {
 
 // Detect whether you're on localhost or live server
 if (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false) {
-	$base_url = '/ICS325/homework/portfolio';
-} else {
 	$base_url = '/avengers_blog';
+} else {
+	$base_url = '/ics325/students/2025/TRana';
 }
 
 $public_url = $base_url . "/public";
@@ -17,7 +17,7 @@ $js_url = $base_url . "/js";
 $css_url = $base_url . "/css";
 
 // Include database connection
-include($_SERVER['DOCUMENT_ROOT'] . $base_url . "/userdb.php");
+include($_SERVER['DOCUMENT_ROOT'] . $base_url . "/config/database.php");
 
 // Path setup
 $includes_path = $_SERVER["DOCUMENT_ROOT"] . $base_url . "/includes";
@@ -50,7 +50,7 @@ session_destroy();
 			<?php if (!empty($old_user)): ?>
 				<p>You are logged out!</p>
 			<?php else: ?>
-				<p>You were not logged in so you have not been logged out.</p>
+				<p>You have logged out.</p>
 			<?php endif; ?>
 			<p><a href="<?php echo $base_url; ?>/home/index.php">Back to Homepage</a></p>
 		</div>
